@@ -90,23 +90,101 @@ app.post('/api/requirements', async (req, res) => {
   const { scenario } = req.body
   if (!scenario?.trim()) return res.status(400).json({ error: 'scenario required' })
 
-  const prompt = `You are an expert System Design Interviewer and Principal Architect.
-Generate exactly 3 highly technical requirements-gathering questions for the scenario below.
-Focus on: scale targets, read/write ratios, latency SLAs, protocol choices, consistency model.
-Do NOT ask generic questions about budget, team size, or timelines.
+  const prompt = `You are a Principal ML Infrastructure Architect and System Design Interviewer.
 
-Output ONLY a valid JSON object — no markdown, no code fences, no commentary:
+First, classify the scenario into one of these domains:
+- AI_SERVING     — LLM/model inference, online serving, embedding APIs
+- AI_TRAINING    — distributed training, fine-tuning, experiment pipelines
+- RAG_SEARCH     — retrieval-augmented generation, vector search, semantic search
+- DATA_PIPELINE  — streaming/batch ETL, feature stores, event processing
+- DISTRIBUTED_SYS — general distributed systems, databases, messaging
+
+Then generate EXACTLY 5 deep technical questions covering these 5 dimensions.
+Adapt each question's specifics to the classified domain — reference real production technologies.
+
+DIMENSION MAP (pick the most relevant branch per domain):
+
+1. SCALE & SLA
+   - AI_SERVING/RAG: peak request/s, p50/p99 TTFT and TBT latency SLOs, concurrent sessions, burst multiplier
+   - TRAINING: dataset size, training time budget, checkpoint frequency, spot-instance tolerance
+   - DATA_PIPELINE: event/s ingest rate, end-to-end latency SLA, replay window, exactly-once vs at-least-once
+   - DISTRIBUTED_SYS: read/write ratio, consistency level, replication factor, geo-distribution
+
+2. COMPUTE & INFERENCE ENGINE
+   - AI_SERVING: vLLM (PagedAttention, continuous batching, TP), Triton Inference Server (static/dynamic batching, multi-framework, ensemble), Ray Serve (Python-native actors, fractional GPU), SageMaker Real-Time Inference (managed, BYO container), TensorRT-LLM (NVIDIA-optimized)
+   - AI_TRAINING: Ray Train + FSDP/DeepSpeed ZeRO, Megatron-LM (3D parallel), SageMaker Training Jobs, Kubeflow MPI operator
+   - RAG_SEARCH: embedding model (OpenAI, BGE, Cohere), reranking (cross-encoder), hybrid search
+   - DATA_PIPELINE: Spark/Flink (batch vs streaming), Kafka Streams, Kinesis Data Analytics
+   - DISTRIBUTED_SYS: compute tier, instance family, auto-scaling strategy
+
+3. ROUTING & LOAD BALANCING STRATEGY
+   - AI_SERVING: prefix-hash routing (route req to replica with matching KV prefix → maximize cache reuse), composite queue-depth + context-backlog routing (route to replica with lowest token-backlog), model-capability routing (router selects model by query complexity via small classifier), session-affinity routing (keep multi-turn context on same replica), disaggregated prefill/decode routing (separate prefill-heavy vs decode-heavy replicas)
+   - RAG_SEARCH: query router (dense vs sparse vs hybrid), multi-index routing, fallback chains
+   - DATA_PIPELINE: partitioning strategy (key-hash, range, round-robin), consumer group rebalancing
+   - DISTRIBUTED_SYS: consistent hashing, service mesh (Istio/Envoy), L7 routing rules
+
+4. SCHEDULING & AUTOSCALING
+   - AI/K8S workloads: KEDA (event-driven HPA — scale on GPU util, queue depth, custom Prometheus metrics), kAI Scheduler (gang scheduling for multi-GPU jobs, fair-share queues, preemption, bin-packing), Kubernetes default scheduler (basic), custom priority queue (SLA-tiered dispatch — premium vs batch), Volcano (batch/HPC jobs), Argo Workflows (DAG pipelines)
+   - TRAINING: spot-instance preemption handling, checkpoint-resume, job priority
+   - DATA_PIPELINE: Airflow/Prefect/Dagster DAG scheduling, backfill strategy, SLA-based retries
+
+5. STORAGE & CACHING ARCHITECTURE
+   - AI_SERVING: KV cache placement — HBM-only (lowest latency, most expensive), HBM+DRAM tiering (PagedAttention eviction policy), disaggregated KV on SSD via LMCache/InfiniStore (cost-efficient, adds ~5ms), cross-node KV transfer (P2P NVLink for disaggregated prefill/decode); model weights — S3 + EFS mount (shared, slow cold start), NVMe local (fast, per-node), model registry (MLflow/Hugging Face Hub)
+   - RAG_SEARCH: vector DB — Pinecone (managed), Weaviate (self-hosted + hybrid), pgvector (Postgres-native), Qdrant (Rust, high perf); index type — HNSW, IVF-PQ, scalar quantization
+   - TRAINING: distributed checkpoint — FSSpec + S3, NFS, Lustre/GPFS; dataset — Parquet on S3, HuggingFace datasets, tfrecord
+   - DATA_PIPELINE: hot/warm/cold — Redis/Dragonfly (hot), Cassandra/DynamoDB (warm), S3/Iceberg (cold); CDC strategy
+
+RULES:
+- Each question must be answerable in 1-2 sentences but unlock a major architectural branch
+- Hints must reference at least 3 specific real technologies with their key trade-off
+- Do NOT ask about budget, team size, or timelines
+- Questions must be ordered: scale → compute → routing → scheduling → storage
+
+Output ONLY valid JSON — no markdown, no fences, no commentary:
 {
   "scenarioName": "string",
   "technicalDomain": "string",
+  "domain": "AI_SERVING | AI_TRAINING | RAG_SEARCH | DATA_PIPELINE | DISTRIBUTED_SYS",
   "emoji": "string (single emoji)",
   "questions": [
-    { "id": "q1", "label": "short label (2-4 words)", "text": "full question", "hint": "example answer" },
-    { "id": "q2", "label": "...", "text": "...", "hint": "..." },
-    { "id": "q3", "label": "...", "text": "...", "hint": "..." }
+    {
+      "id": "q1",
+      "category": "scale",
+      "label": "Scale & SLA",
+      "text": "precise technical question",
+      "hint": "e.g. 50k req/s peak, p99 TTFT <200ms, 10× burst, 3 regions"
+    },
+    {
+      "id": "q2",
+      "category": "compute",
+      "label": "Compute & Inference Engine",
+      "text": "precise technical question",
+      "hint": "e.g. vLLM (PagedAttention, continuous batching) vs Triton (static batching, multi-framework ensemble) vs Ray Serve (actor model, fractional GPU)"
+    },
+    {
+      "id": "q3",
+      "category": "routing",
+      "label": "Routing Strategy",
+      "text": "precise technical question",
+      "hint": "e.g. prefix-hash (maximize KV reuse) vs composite queue-depth+context-backlog (load balance) vs model-capability router (classifier-based dispatch)"
+    },
+    {
+      "id": "q4",
+      "category": "scheduling",
+      "label": "Scheduling & Autoscaling",
+      "text": "precise technical question",
+      "hint": "e.g. KEDA on GPU-util + queue-depth metrics vs kAI gang-scheduler (fair-share + preemption) vs custom SLA-tiered priority queue"
+    },
+    {
+      "id": "q5",
+      "category": "storage",
+      "label": "Storage & Caching",
+      "text": "precise technical question",
+      "hint": "e.g. HBM-only KV cache vs HBM+DRAM tiering vs LMCache disaggregated SSD; model weights on EFS vs NVMe local"
+    }
   ],
   "calculatorConfig": {
-    "type": "storage_calc | bandwidth_calc | kv_cache_calc | throughput_calc",
+    "type": "kv_cache_calc | throughput_calc | storage_calc | bandwidth_calc",
     "metricsToTrack": ["string"]
   }
 }
@@ -117,7 +195,7 @@ SCENARIO: "${scenario}"`
     const msg = await client.messages.create({
       model: MODEL,
       temperature: 0,
-      max_tokens: 1024,
+      max_tokens: 2048,
       messages: [{ role: 'user', content: prompt }]
     })
     const raw = stripFences(msg.content[0].text, 'json')
@@ -136,21 +214,43 @@ app.post('/api/architecture', async (req, res) => {
   const answersText = Object.entries(answers)
     .map(([id, val]) => {
       const q = questions?.find(q => q.id === id)
-      return `- ${q?.label ?? id}: ${val}`
+      const dim = q?.category ? `[${q.category.toUpperCase()}] ` : ''
+      return `- ${dim}${q?.label ?? id}: ${val}`
     })
     .join('\n')
 
-  const prompt = `You are a Principal Cloud Infrastructure Architect.
-Analyze the scenario and requirements, then output EXACTLY two tagged sections — nothing else outside the tags.
+  const prompt = `You are a Principal ML Infrastructure Architect.
+The requirements below came from 5 deep technical dimensions (scale, compute/inference engine, routing, scheduling, storage).
+Use the EXACT technologies the user named — do not substitute generic names.
+Output EXACTLY two tagged sections — nothing else outside the tags.
 
 <SYSTEM_CONFIG>
 {
-  "summary": "2-sentence architectural overview",
-  "bottlenecksIdentified": ["list bottlenecks"],
-  "recommendedTechStack": { "compute": "", "caching": "", "database": "", "transport": "" },
-  "scaleEstimates": { "qps": "", "storage": "", "cache": "", "bandwidth": "" },
+  "summary": "2-sentence architectural overview naming the specific chosen technologies",
+  "bottlenecksIdentified": [
+    "specific bottleneck with numbers, e.g. KV cache eviction pressure at >70% HBM fill"
+  ],
+  "recommendedTechStack": {
+    "inferenceEngine": "exact choice + key config, e.g. vLLM v0.4 TP=4 continuous batching",
+    "routing": "exact routing algo + trigger, e.g. prefix-hash router (>40% cache-hit threshold)",
+    "scheduler": "exact scheduler + config, e.g. KEDA on prometheus/gpu_util >80% + kAI gang-sched",
+    "kvCache": "exact tiering, e.g. HBM 80GB + DRAM 256GB via LMCache disaggregated",
+    "modelStorage": "exact store, e.g. S3 + EFS mount cold / NVMe local hot",
+    "vectorDb": "if applicable"
+  },
+  "scaleEstimates": {
+    "qps": "Xk req/s\\nderivation: N replicas × throughput per replica",
+    "kvCacheGB": "X GB\\nderivation: 2×L×H×D×S×B×P / 1e9",
+    "modelWeightsGB": "X GB\\nderivation: params × precision bytes",
+    "bandwidth": "X GB/s\\nderivation: tokens/s × bytes/token"
+  },
   "tradeoffs": [
-    { "dimension": "", "choice": "", "tradeoff": "", "winner": "" }
+    {
+      "dimension": "routing",
+      "choice": "prefix-hash vs queue-depth",
+      "tradeoff": "prefix-hash raises KV hit rate 40%→75% but creates hotspot on popular prefixes; queue-depth balances load but wastes cache",
+      "winner": "prefix-hash + fallback to queue-depth on hotspot"
+    }
   ]
 }
 </SYSTEM_CONFIG>
@@ -163,44 +263,46 @@ Analyze the scenario and requirements, then output EXACTLY two tagged sections �
 MERMAID DIAGRAM RULES — MANDATORY
 ════════════════════════════
 
-STRUCTURE: Use graph TD with 4 named subgraphs stacked top-to-bottom:
-  T1 (Client and Routing) → T2 (Serving Layer) → T3 (State and Cache) → T4 (Control and Telemetry)
+STRUCTURE: graph TD with 4 named subgraphs top-to-bottom using the ACTUAL chosen technologies:
+  T1 ["Client & Routing Layer"]    — ingress, load balancer, routing algorithm node
+  T2 ["Serving / Compute Layer"]   — inference engine replicas (fast-path + slow-path pools)
+  T3 ["State & Cache Layer"]       — KV cache tiers, model weight store, vector DB if applicable
+  T4 ["Control & Telemetry"]       — scheduler, autoscaler, metrics, model registry
 
-PARALLEL POOLS: Inside T2, add two nested subgraphs FP (fast-path) and SP (slow-path).
-Each nested subgraph MUST contain at least one real node — never leave a subgraph with only comments.
+PARALLEL POOLS in T2: nested subgraphs FP (fast-path, latency-sensitive) and SP (slow-path, batch/async).
+Each MUST have ≥1 real node. Name nodes after the actual technology: e.g. fp1["vLLM Replica-0\\n..."]
 
-CORRELATION LABELS: Every primary node must include trade-off text inside its double-quoted label.
-Use plain ASCII only — no Unicode arrows. Use up/down arrows like (UP) and (DOWN) instead of ▲▼.
-Example:
-  fp1["vLLM Fast-Path\\n---\\n(UP) Batch Size\\n  -> (UP) Throughput\\n  -> (DOWN) TTFT Latency"]
+CORRELATION LABELS: embed (UP)/(DOWN) trade-off arrows inside every primary node label.
+Use only plain ASCII. No Unicode. Example:
+  rtr["Prefix-Hash Router\\n---\\n(UP) Prefix Match\\n  -> (UP) KV Hit Rate\\n  -> (DN) Hotspot Risk"]
 
 CONNECTIONS:
-  Data path (critical <500ms):    A ==> B
-  Control/telemetry (async):      A -.-> B
-  Inter-component correlation:    batch1 -.->|"(UP) Batch = (UP) Cache Contention"| cache1
+  Critical data path (<SLA ms):   A ==> B
+  Async/control:                  A -.-> B
+  Trade-off correlation:          n1 -.->|"(UP) Batch = (DN) TTFT"| n2
 
 NODE SHAPES:
-  Clients:    ([label])    Databases: [(label)]
-  Services:   [label]      Caches:  [[label]]
-  Queues:     >label]
+  Clients/users: ([label])    Databases/stores: [(label)]
+  Services:      [label]      Caches:           [[label]]
+  Queues:        >label]      Schedulers:       {label}
 
-IDs: short alphanumeric only. Labels: always double-quoted. No bare parentheses outside quotes.
-
-LAYOUT INIT (first line of diagram):
+LAYOUT INIT (first line):
 %%{init: {"flowchart": {"nodeSpacing": 80, "rankSpacing": 65, "curve": "linear"}}}%%
+
+IDs: short alphanumeric. Labels: always double-quoted. No bare parentheses outside quotes.
 
 ════════════════════════════
 INPUTS
 ════════════════════════════
 Scenario: ${scenario}
-Requirements:
+Requirements (5 dimensions):
 ${answersText}`
 
   try {
     const msg = await client.messages.create({
       model: MODEL,
       temperature: 0,
-      max_tokens: 4096,
+      max_tokens: 6000,
       messages: [{ role: 'user', content: prompt }]
     })
 

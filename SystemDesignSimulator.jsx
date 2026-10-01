@@ -326,6 +326,25 @@ function FlowTracker({ currentStage, completedStages, onStageClick }) {
   )
 }
 
+// ── CategoryBadge ──────────────────────────────────────────────────────────────
+
+const CATEGORY_STYLE = {
+  scale:      { bg: 'bg-emerald-950', text: 'text-emerald-400', border: 'border-emerald-800', label: 'Scale & SLA' },
+  compute:    { bg: 'bg-blue-950',    text: 'text-blue-400',    border: 'border-blue-800',    label: 'Compute / Inference' },
+  routing:    { bg: 'bg-purple-950',  text: 'text-purple-400',  border: 'border-purple-800',  label: 'Routing' },
+  scheduling: { bg: 'bg-amber-950',   text: 'text-amber-400',   border: 'border-amber-800',   label: 'Scheduling' },
+  storage:    { bg: 'bg-cyan-950',    text: 'text-cyan-400',    border: 'border-cyan-800',    label: 'Storage / Cache' },
+}
+
+function CategoryBadge({ category }) {
+  const s = CATEGORY_STYLE[category] ?? CATEGORY_STYLE.scale
+  return (
+    <span className={`text-[8px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded border ${s.bg} ${s.text} ${s.border}`}>
+      {s.label}
+    </span>
+  )
+}
+
 // ── RequirementsChat ───────────────────────────────────────────────────────────
 
 function RequirementsChat({ questions, onComplete }) {
@@ -376,8 +395,9 @@ function RequirementsChat({ questions, onComplete }) {
       <div className="flex flex-col">
         {questions.slice(0, answeredCount).map((q) => (
           <div key={q.id} className="mb-3">
-            {/* Interviewer bubble */}
-            <div className="flex gap-2 mb-1">
+            {/* Category + interviewer bubble */}
+            {q.category && <CategoryBadge category={q.category} />}
+            <div className="flex gap-2 mt-1 mb-1">
               <span className="text-[9px] font-mono bg-emerald-950 text-emerald-400 border border-emerald-800 px-1.5 py-0.5 rounded shrink-0 mt-0.5 h-fit">
                 SDE-V
               </span>
@@ -395,8 +415,9 @@ function RequirementsChat({ questions, onComplete }) {
         {/* Current question */}
         {!allAnswered && questions[currentQ] && (
           <div className="mb-2">
-            <div className="text-[10px] font-mono text-emerald-500 mb-1">
-              {questions[currentQ].label}
+            <div className="flex items-center gap-2 mb-1.5">
+              <CategoryBadge category={questions[currentQ].category} />
+              <span className="text-[10px] font-mono text-emerald-500">{questions[currentQ].label}</span>
             </div>
             <div className="flex gap-2">
               <span className="text-[9px] font-mono bg-emerald-950 text-emerald-400 border border-emerald-800 px-1.5 py-0.5 rounded shrink-0 mt-0.5 h-fit">
